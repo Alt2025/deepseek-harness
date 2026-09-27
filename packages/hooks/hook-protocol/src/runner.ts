@@ -6,7 +6,7 @@
  * @module @deepseek-ai/dsh-hook-protocol/runner
  */
 
-import type { ShellExecutor } from '@deepseek-ai/dsh-shell'
+import type { ShellExecRequest, ShellExecutor } from '@deepseek-ai/dsh-shell'
 import { parseHookOutput } from './codec.ts'
 import type { CommandHook, HookOutput } from './types.ts'
 
@@ -27,6 +27,14 @@ export interface RunHookOptions {
   env?: Record<string, string>
   /** Working directory for the hook (defaults to the executor's own default when omitted). */
   cwd?: string
+  /**
+   * Standing sandbox policy for the hook process, resolved by the bridge from
+   * the owning session. A confining executor falls back to its agentless
+   * deployment policy when this is absent, and that fallback's workspace root
+   * need not contain {@link RunHookOptions.cwd}, so a hook that writes inside
+   * the session workspace is denied.
+   */
+  sandboxPolicy?: ShellExecRequest['sandboxPolicy']
   /** Explicit owning-operation signal; firing it cancels the hook run. */
   readonly signal: AbortSignal
   /** Whether to append a trailing newline to the stdin payload (CC yes, Codex no). */
@@ -60,7 +68,7 @@ export interface RunHookResult {
  * no exit code, so this function never throws or crashes the calling turn.
  * @param bash - The executor service the command runs through.
  * @param hook - the configured command; its `timeoutSec` (wire unit: seconds) overrides the default timeout.
- * @param options - the invocation's payload, env, cwd, signal, stdin framing, and default timeout.
+ * @param options - the invocation's payload, env, cwd, sandbox policy, signal, stdin framing, and default timeout.
  * @param now - millisecond clock used for the reported duration.
  * @returns the decoded output plus the run's wall-clock duration.
  */
@@ -81,6 +89,7 @@ export async function runHook(
     signal: options.signal,
     ...options.cwd !== undefined ? { workdir: options.cwd } : {},
     ...options.env !== undefined ? { env: options.env } : {},
+    ...options.sandboxPolicy !== undefined ? { sandboxPolicy: options.sandboxPolicy } : {},
   }
 
   try {
