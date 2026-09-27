@@ -65,7 +65,7 @@ The provider reserves the shared computer-use registration before loading native
 | [src/index.ts](src/index.ts) | Native runtime ownership, catalog validation, tool registration, and provider guidance |
 | — | No runtime invariant companion is published; resource ownership has no independently observed state to compare. |
 
-Tool definitions reuse the existing MCP result adapter. Cua Driver's JSON catalog determines the schemas; its raw result supplies canonical text, structured output, and image bytes. The computer-use service carries only the provider name and exclusive registration.
+Tool definitions reuse the existing MCP result adapter. Cua Driver's JSON catalog determines the schemas; its raw result supplies canonical text, structured output, and image bytes. Because the browser tools answer with a summary line while their next call requires the target and tab handles held in the structured output, this provider renders that payload after the text so the model can continue the sequence. The computer-use service carries only the provider name and exclusive registration.
 
 </details>
 

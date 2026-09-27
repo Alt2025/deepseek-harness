@@ -106,6 +106,10 @@ export async function apply(ctx: Context): Promise<void> {
         description: tool.description ?? '',
         inputSchema: tool.inputSchema,
         outputSchema: tool.outputSchema,
+        // Cua Driver's browser tools answer with a summary line and keep the
+        // session-scoped target and tab handles in `structuredContent`, while
+        // the next call's schema requires those handles; render both.
+        includeStructuredContent: true,
         async call(args, execution) {
           const combined = AbortSignal.any([execution.signal, lifetime.signal])
           combined.throwIfAborted()
