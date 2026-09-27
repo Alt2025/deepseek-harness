@@ -42,6 +42,41 @@ describe('MCP result callback adaptation', () => {
     }
   })
 
+  it('renders structured content after the text only for tools that opt in', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SystemPrompt)
+      await ctx.plugin(ToolRuntime)
+      const structuredContent = { tabs: [{ tab_id: 'tab-1' }], target_id: 'bt-1' }
+      const call = async (): Promise<unknown> => ({
+        content: [{ type: 'text', text: 'bound target bt-1 (exact) with 1 tab(s)' }],
+        structuredContent,
+      })
+      for (const [name, includeStructuredContent] of [['browser_summary', false], ['browser_handles', true]] as const) {
+        ctx.tools.register(createMcpToolDefinition(ctx, {
+          name, rawName: name, description: 'Bind one browser target.', inputSchema: { type: 'object' },
+          ...includeStructuredContent ? { includeStructuredContent } : {},
+          call,
+        }))
+      }
+      const signal = new AbortController().signal
+      const summary = await ctx.tools.execute({
+        name: 'browser_summary', callId: ToolCallId('summary'), arguments: {}, signal,
+      })
+      const handles = await ctx.tools.execute({
+        name: 'browser_handles', callId: ToolCallId('handles'), arguments: {}, signal,
+      })
+
+      expect(summary.content).toEqual([{ type: 'text', text: 'bound target bt-1 (exact) with 1 tab(s)' }])
+      expect(handles.content).toEqual([{
+        type: 'text',
+        text: `bound target bt-1 (exact) with 1 tab(s)\n${JSON.stringify(structuredContent)}`,
+      }])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it.each([null, { content: [42] }, { content: [{ type: 'image' }] }])(
     'rejects invalid external results before exposing content (%j)', async (invalid) => {
       const ctx = new Context()

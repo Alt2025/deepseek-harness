@@ -204,6 +204,15 @@ export interface McpToolDefinitionOptions {
   inputSchema: Record<string, unknown>
   /** Advertised structured output schema, when present. */
   outputSchema?: unknown
+  /**
+   * Render `structuredContent` after the text projection. A server whose text
+   * content is only a summary keeps continuation ids in the structured payload
+   * (browser targets and tab handles, for example) while its own input schema
+   * requires the model to pass them back, so a text-only projection makes these
+   * tools unusable. Off by default: a conforming server already serializes the
+   * payload into a text block, and rendering it twice only spends tokens.
+   */
+  includeStructuredContent?: boolean
   /** Whether the upstream tool requires the unsupported task execution extension. */
   taskRequired?: boolean
   /**
@@ -232,7 +241,7 @@ export function createMcpToolDefinition(
     name,
     description,
     parameters: inputSchema,
-    output: createOutput(rawName, supportedOutputSchema(options.outputSchema)),
+    output: createOutput(rawName, supportedOutputSchema(options.outputSchema), options.includeStructuredContent === true),
     execute: createExecutor(ctx, options, projections),
     projectContent(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>) {
       const projection = projections.get(exec)
@@ -247,7 +256,11 @@ export function createMcpToolDefinition(
 }
 
 /** Build the canonical result schema and existing Native text projection. */
-function createOutput(rawName: string, structuredSchema: JsonSchemaNode | undefined): ToolDefinition['output'] {
+function createOutput(
+  rawName: string,
+  structuredSchema: JsonSchemaNode | undefined,
+  includeStructuredContent: boolean,
+): ToolDefinition['output'] {
   return {
     schema: {
       type: 'object',
@@ -260,7 +273,9 @@ function createOutput(rawName: string, structuredSchema: JsonSchemaNode | undefi
     },
     render(_args: unknown, value: JsonValue) {
       const result = value as McpResult
-      return [{ type: 'text', text: extractText(result.content, rawName) }]
+      const text = extractText(result.content, rawName)
+      if (!includeStructuredContent || result.structuredContent === undefined) return [{ type: 'text', text }]
+      return [{ type: 'text', text: `${text}\n${JSON.stringify(result.structuredContent)}` }]
     },
   }
 }
