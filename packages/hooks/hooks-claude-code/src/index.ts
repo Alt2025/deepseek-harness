@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision, TurnBoundaryProjection } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -151,6 +152,12 @@ export function apply(ctx: Context, config: Config): void {
     // Run the hook in the agent's session workspace (the `session/new` cwd on the session
     // header), not the executor or entry-point process's launch dir.
     const workdir = opts.agent?.session.header.cwd
+    // Confine the hook to that same session workspace. A confining executor
+    // otherwise resolves its agentless deployment policy, whose workspace root
+    // can exclude the hook's cwd (and every path it writes there).
+    const sandboxPolicy = opts.agent === undefined
+      ? undefined
+      : ctx.get('sandboxPolicy')?.resolve({ session: opts.agent.session })
     // CLAUDE_PROJECT_DIR: an explicit config value wins; otherwise default it to the session
     // workspace (the same dir the hook runs in).
     const projectDir = config.projectDir ?? workdir
@@ -171,6 +178,7 @@ export function apply(ctx: Context, config: Config): void {
           defaultTimeoutMs,
           ...hookEnv ? { env: hookEnv } : {},
           ...workdir !== undefined ? { cwd: workdir } : {},
+          ...sandboxPolicy !== undefined ? { sandboxPolicy } : {},
           signal: opts.signal,
           trailingNewline: true,
           // Discard a `hookSpecificOutput` block whose `hookEventName` names a

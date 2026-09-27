@@ -61,7 +61,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### How hooks run and fail
 
-- Hooks run in your project directory — the agent's session workspace — so `pwd` and relative paths in your hooks refer to your project, not the server's launch directory.
+- Hooks run in your project directory — the agent's session workspace — so `pwd` and relative paths in your hooks refer to your project, not the server's launch directory. A mounted file sandbox grants writes under that same session workspace rather than the deployment's default workspace, so a hook that records state inside the project is not denied.
 - One config applies to the whole process: it is read once at startup, and a relative `configPath` resolves from the directory that launched the process.
 - Only synchronous command hooks run; an `async: true` or non-command hook is skipped with a warning.
 - Hooks on the same event run one after another, in config order.

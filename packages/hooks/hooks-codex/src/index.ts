@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -132,6 +133,12 @@ export function apply(ctx: Context, config: Config): void {
     // Run hooks in the agent's session workspace so relative paths address the
     // user's project rather than the server launch directory.
     const workdir = opts.agent?.session.header.cwd
+    // Confine the hook to that same session workspace. A confining executor
+    // otherwise resolves its agentless deployment policy, whose workspace root
+    // can exclude the hook's cwd (and every path it writes there).
+    const sandboxPolicy = opts.agent === undefined
+      ? undefined
+      : ctx.get('sandboxPolicy')?.resolve({ session: opts.agent.session })
     for (const group of groups) {
       // Codex always interprets matchers as regexes; it has no literal fast path.
       if (!matchesMatcher(group.matcher, matchQuery, 'codex')) continue
@@ -148,6 +155,7 @@ export function apply(ctx: Context, config: Config): void {
           payload,
           defaultTimeoutMs,
           ...workdir !== undefined ? { cwd: workdir } : {},
+          ...sandboxPolicy !== undefined ? { sandboxPolicy } : {},
           signal: opts.signal,
           trailingNewline: false, // Codex writes stdin without a trailing newline.
           // Discard a `hookSpecificOutput` block naming a different event.

@@ -99,6 +99,24 @@ describe('runHook — payload + env + stdin plumbing', () => {
     expect(specs[0]!.workdir).toBe('/work')
   })
 
+  it('threads the caller-resolved sandbox policy into the request', async () => {
+    const { bash, specs } = recordingBash(async () => result())
+    const sandboxPolicy = { mode: 'workspace-write' as const, workspaceRoot: '/session-workspace' }
+    await runHook(bash, { command: 'h' }, {
+      payload: {}, cwd: '/session-workspace', sandboxPolicy, signal: testSignal(),
+      defaultTimeoutMs: 1000, trailingNewline: true,
+    }, clock())
+    expect(specs[0]!.sandboxPolicy).toEqual(sandboxPolicy)
+  })
+
+  it('leaves the sandbox policy to the executor when the caller supplies none', async () => {
+    const { bash, specs } = recordingBash(async () => result())
+    await runHook(bash, { command: 'h' }, {
+      payload: {}, cwd: '/work', signal: testSignal(), defaultTimeoutMs: 1000, trailingNewline: true,
+    }, clock())
+    expect(specs[0]!.sandboxPolicy).toBeUndefined()
+  })
+
   it('a per-hook timeoutSec (seconds) overrides the default (ms)', async () => {
     const { bash, specs } = recordingBash(async () => result())
     await runHook(bash, { command: 'h', timeoutSec: 3 }, { payload: {}, signal: testSignal(), defaultTimeoutMs: 60000, trailingNewline: true }, clock())

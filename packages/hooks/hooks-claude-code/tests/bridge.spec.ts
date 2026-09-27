@@ -133,6 +133,27 @@ describe('hooks-claude-code bridge — UserPromptSubmit', () => {
   })
 })
 
+describe('hooks-claude-code bridge — session sandbox policy', () => {
+  it('runs hook commands under the session workspace sandbox policy', async () => {
+    const dir = writeConfig({ Stop: [{ hooks: [{ type: 'command', command: 'exit 0' }] }] })
+    // The deployment's agentless policy root need not contain the session cwd,
+    // so a hook that writes inside the session workspace is denied without this.
+    const policy = { mode: 'workspace-write' as const, workspaceRoot: '/session-workspace' }
+    const resolve = vi.fn(() => policy)
+    const request = vi.spyOn(LocalBashExecutor.prototype, 'resolve')
+
+    const adapter = new MockAdapter([textResponse('done')])
+    const ctx = await harness(dir, adapter, (scope) => { scope.provide('sandboxPolicy', { resolve }) })
+    const agent = await ctx.agentLoop.create(SessionId('sandbox-policy'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(resolve).toHaveBeenCalledWith({ session: agent.session })
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ sandboxPolicy: policy }))
+    request.mockRestore()
+  }, 15_000)
+})
+
 describe('hooks-claude-code bridge — PreToolUse', () => {
   it('a matching PreToolUse hook that exits 2 denies the tool (isError result), tool never runs', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-hooks-claude-'))
